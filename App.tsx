@@ -17,6 +17,9 @@ import CallCenterStats from './components/CallCenter/CallCenterStats';
 import Sidebar from './components/Layout/Sidebar';
 import Header from './components/Layout/Header';
 
+// الرابط الثابت لجدول البيانات الخاص بك
+const TARGET_SHEET_URL = "https://docs.google.com/spreadsheets/d/1c7HDTwhrU1WsP0RGwXFn6zkhp68QNIonzbCIv81f_xw/export?format=csv";
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -24,6 +27,49 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // وظيفة جلب البيانات من Google Sheet
+  const syncWithGoogleSheet = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch(TARGET_SHEET_URL);
+      if (!response.ok) throw new Error("فشل الاتصال بجدول البيانات");
+      
+      const csvText = await response.text();
+      const lines = csvText.split('\n');
+      
+      if (lines.length > 1) {
+        const remoteTasks: Task[] = lines.slice(1)
+          .filter(line => line.trim() !== '')
+          .map((line, index) => {
+            const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            return {
+              id: `remote-${index}-${values[4] || Date.now()}`,
+              studentName: values[0]?.replace(/"/g, '').trim(),
+              type: values[1]?.replace(/"/g, '').trim() || 'كول سنتر',
+              description: values[2]?.replace(/"/g, '').trim() || 'بيانات مستوردة',
+              duration: parseInt(values[3]) || 15,
+              createdAt: values[4]?.replace(/"/g, '').trim() || new Date().toISOString(),
+              userId: 'remote-system',
+              username: values[5]?.replace(/"/g, '').trim() || 'نظام خارجي'
+            };
+          });
+
+        // دمج البيانات المستوردة مع المهام المحلية مع تجنب التكرار البسيط
+        setTasks(prevTasks => {
+          const localTasks = prevTasks.filter(t => !t.id.startsWith('remote-'));
+          const combined = [...remoteTasks, ...localTasks];
+          localStorage.setItem('tasks', JSON.stringify(combined));
+          return combined;
+        });
+      }
+    } catch (error) {
+      console.error("خطأ في مزامنة الشيت:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
 
   // Load initial data
   useEffect(() => {
@@ -44,7 +90,10 @@ const App: React.FC = () => {
       localStorage.setItem('users', JSON.stringify([admin]));
       setUsers([admin]);
     }
-  }, []);
+
+    // تشغيل المزامنة فور فتح التطبيق
+    syncWithGoogleSheet();
+  }, [syncWithGoogleSheet]);
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
@@ -164,6 +213,14 @@ const App: React.FC = () => {
       />
       <div className="flex-1 flex flex-col min-w-0">
         <Header user={user} activeTab={activeTab} />
+        
+        {/* شريط المزامنة التلقائية */}
+        {isSyncing && (
+          <div className="bg-indigo-600 text-white text-[10px] py-1 text-center font-bold animate-pulse">
+            جاري مزامنة البيانات من Google Sheet...
+          </div>
+        )}
+        
         <main className="p-4 md:p-8 flex-1 overflow-y-auto">
           {renderContent()}
         </main>

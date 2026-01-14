@@ -2,7 +2,7 @@
 import React from 'react';
 import { User } from '../../types';
 import { NAV_ITEMS } from '../../constants';
-import { Bell, User as UserIcon } from 'lucide-react';
+import { Bell, User as UserIcon, RefreshCw } from 'lucide-react';
 
 interface HeaderProps {
   user: User;
@@ -22,6 +22,11 @@ const Header: React.FC<HeaderProps> = ({ user, activeTab }) => {
       </div>
 
       <div className="flex items-center space-x-4 space-x-reverse">
+        {/* أيقونة مزامنة سريعة */}
+        <div className="p-2 text-gray-300 hover:text-emerald-500 transition-colors cursor-help" title="مزامنة البيانات السحابية نشطة">
+          <RefreshCw size={18} />
+        </div>
+
         <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors relative">
           <Bell size={20} />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
